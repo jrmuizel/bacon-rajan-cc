@@ -296,7 +296,7 @@ impl<T: Trace> Cc<T> {
             return;
         }
 
-        self.free();
+        crate::cc_box_ptr::free(self._ptr);
     }
 
     fn possible_root(&mut self) {
@@ -842,9 +842,9 @@ impl<T: Trace> CcBoxPtr for Cc<T> {
         self._ptr.as_mut().drop_value();
     }
 
-    unsafe fn deallocate(&mut self) {
-        self._ptr.as_mut().deallocate();
-    }
+    /*unsafe fn deallocate(&mut self) {
+        dealloc(self._ptr.cast().as_ptr(), Layout::new::<CcBox<T>>());
+    }*/
 }
 
 impl<T: Trace> CcBoxPtr for Weak<T> {
@@ -863,9 +863,9 @@ impl<T: Trace> CcBoxPtr for Weak<T> {
         self._ptr.as_mut().drop_value();
     }
 
-    unsafe fn deallocate(&mut self) {
-        self._ptr.as_mut().deallocate();
-    }
+    /*unsafe fn deallocate(&mut self) {
+        dealloc(self._ptr.cast().as_ptr(), Layout::new::<CcBox<T>>());
+    }*/
 }
 
 impl<T: Trace> CcBoxPtr for CcBox<T> {
@@ -877,11 +877,16 @@ impl<T: Trace> CcBoxPtr for CcBox<T> {
         ptr::read(&self.value);
     }
 
-    unsafe fn deallocate(&mut self) {
-        let ptr : *mut CcBox<T> = self;
-        dealloc(NonNull::new_unchecked(ptr).cast().as_ptr(), Layout::new::<CcBox<T>>());
-    }
+    /*unsafe fn deallocate(&mut self) {
+        panic!();
+        //dealloc(NonNull::new_unchecked(ptr).cast().as_ptr(), Layout::new::<CcBox<T>>());
+    }*/
 }
+
+unsafe fn deallocate(mut ptr: NonNull<CcBoxPtr>) {
+    dealloc(ptr.cast().as_ptr(), Layout::for_value(ptr.as_ref()));
+}
+
 
 #[cfg(test)]
 mod tests {
