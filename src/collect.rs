@@ -284,16 +284,16 @@ fn scan_roots() {
 /// there. It will be freed in the next collection when we iterate over the
 /// buffer in `mark_roots`.
 fn collect_roots() {
-    fn collect_white(s: NonNull<CcBoxPtr>) {
+    let mut white = Vec::new();
+    fn collect_white(s: NonNull<CcBoxPtr>, white: &mut Vec<NonNull<CcBoxPtr>>) {
         unsafe {
             if s.as_ref().color() == Color::White && !s.as_ref().buffered() {
                 s.as_ref().data().color.set(Color::Black);
                 s.as_ref().trace(&mut |t| {
-                    collect_white(t);
+                    collect_white(t, white);
                 });
-                unsafe {
-                    free(s);
-                }
+                s.as_ref().inc_weak();
+                white.push(s);
             }
 
         }
@@ -309,7 +309,15 @@ fn collect_roots() {
         let mut v = r.borrow_mut();
         for s in v.drain(..) {
             unsafe { s.as_ref() }.data().buffered.set(false);
-            collect_white(s);
+            collect_white(s, &mut white);
         }
     });
+
+    for i in &white {
+        unsafe { free(*i); }
+    }
+
+    for i in &white {
+        unsafe { crate::deallocate(*i); }
+    }
 }
