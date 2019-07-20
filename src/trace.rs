@@ -21,7 +21,7 @@ pub trait Trace {
     ///
     /// Failing to invoke the tracer on every owned `CcBoxPtr` can lead to
     /// leaking cycles.
-    fn trace(&mut self, tracer: &mut Tracer);
+    fn trace(&self, tracer: &mut Tracer);
 }
 
 mod impls {
@@ -31,68 +31,68 @@ mod impls {
         pub use super::*;
 
         impl Trace for bool {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
 
         impl Trace for char {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
 
         impl Trace for f32 {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
 
         impl Trace for f64 {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
 
         impl Trace for i16 {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
 
         impl Trace for i32 {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
 
         impl Trace for i64 {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
 
         impl Trace for i8 {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
 
         impl Trace for isize {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
 
         impl Trace for str {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
 
         impl Trace for u16 {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
 
         impl Trace for u32 {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
 
         impl Trace for u64 {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
 
         impl Trace for u8 {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
 
         impl Trace for usize {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
 
         impl<'a, T: Trace> Trace for &'a mut [T] {
-            fn trace(&mut self, tracer: &mut Tracer) {
-                for t in &mut self[..] {
+            fn trace(&self, tracer: &mut Tracer) {
+                for t in &self[..] {
                     t.trace(tracer);
                 }
             }
@@ -179,7 +179,7 @@ mod impls {
         pub use super::*;
 
         impl<T: Trace> Trace for Box<T> {
-            fn trace(&mut self, tracer: &mut Tracer) {
+            fn trace(&self, tracer: &mut Tracer) {
                 (**self).trace(tracer);
             }
         }
@@ -190,13 +190,13 @@ mod impls {
         use std::cell;
 
         impl<T: Copy + Trace> Trace for cell::Cell<T> {
-            fn trace(&mut self, tracer: &mut Tracer) {
+            fn trace(&self, tracer: &mut Tracer) {
                 self.get().trace(tracer);
             }
         }
 
         impl<T: Trace> Trace for cell::RefCell<T> {
-            fn trace(&mut self, tracer: &mut Tracer) {
+            fn trace(&self, tracer: &mut Tracer) {
                 // If the RefCell is currently borrowed we
                 // assume there's an outstanding reference to this
                 // cycle so it's ok if we don't trace through it.
@@ -215,7 +215,7 @@ mod impls {
         use std::hash;
 
         impl<K, V: Trace> Trace for collections::BTreeMap<K, V> {
-            fn trace(&mut self, tracer: &mut Tracer) {
+            fn trace(&self, tracer: &mut Tracer) {
                 for (_, v) in self {
                     v.trace(tracer);
                 }
@@ -223,7 +223,7 @@ mod impls {
         }
 
         impl<K: Eq + hash::Hash + Trace, V: Trace> Trace for collections::HashMap<K, V> {
-            fn trace(&mut self, tracer: &mut Tracer) {
+            fn trace(&self, tracer: &mut Tracer) {
                 for (_, v) in self {
                     v.trace(tracer);
                 }
@@ -231,7 +231,7 @@ mod impls {
         }
 
         impl<T: Trace> Trace for collections::LinkedList<T> {
-            fn trace(&mut self, tracer: &mut Tracer) {
+            fn trace(&self, tracer: &mut Tracer) {
                 for t in self {
                     t.trace(tracer);
                 }
@@ -239,7 +239,7 @@ mod impls {
         }
 
         impl<T: Trace> Trace for collections::VecDeque<T> {
-            fn trace(&mut self, tracer: &mut Tracer) {
+            fn trace(&self, tracer: &mut Tracer) {
                 for t in self {
                     t.trace(tracer);
                 }
@@ -250,7 +250,7 @@ mod impls {
     mod vec {
         pub use super::*;
         impl<T: Trace> Trace for Vec<T> {
-            fn trace(&mut self, tracer: &mut Tracer) {
+            fn trace(&self, tracer: &mut Tracer) {
                 for t in self {
                     t.trace(tracer);
                 }
@@ -261,7 +261,7 @@ mod impls {
     mod string {
         pub use super::*;
         impl Trace for String {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
     }
 
@@ -270,23 +270,23 @@ mod impls {
         use std::ffi;
 
         impl Trace for ffi::CStr {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
 
         impl Trace for ffi::CString {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
 
         impl Trace for ffi::NulError {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
 
         impl Trace for ffi::OsStr {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
 
         impl Trace for ffi::OsString {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
     }
 
@@ -295,66 +295,66 @@ mod impls {
         use std::io;
 
         impl<T> Trace for io::BufReader<T> {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
 
         impl<T: io::Write> Trace for io::BufWriter<T> {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
 
         impl<T> Trace for io::Cursor<T> {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
 
         impl Trace for io::Empty {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
 
         impl Trace for io::Error {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
 
         impl<T> Trace for io::IntoInnerError<T> {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
 
         impl<T: io::Write> Trace for io::LineWriter<T> {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
 
         impl<T> Trace for io::Lines<T> {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
 
         impl Trace for io::Repeat {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
 
         impl Trace for io::Sink {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
 
         impl<T> Trace for io::Split<T> {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
 
         impl Trace for io::Stderr {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
 
         impl Trace for io::Stdin {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
 
         impl Trace for io::Stdout {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
 
         impl<T> Trace for io::Take<T> {
-            fn trace(&mut self, _tracer: &mut Tracer) { }
+            fn trace(&self, _tracer: &mut Tracer) { }
         }
     }
-
+/*
     mod net {
         pub use super::*;
         use std::net;
@@ -537,4 +537,5 @@ mod impls {
             fn trace(&mut self, _tracer: &mut Tracer) { }
         }
     }
+    */
 }
