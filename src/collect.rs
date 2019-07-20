@@ -191,16 +191,16 @@ pub fn collect_cycles() {
 /// garbage cycle, and we will have to restore its old reference count in
 /// `scan_roots`.
 fn mark_roots() {
-    fn mark_gray(cc_box_ptr: &mut CcBoxPtr) {
-        if cc_box_ptr.color() == Color::Gray {
+    fn mark_gray(cc_box_ptr: NonNull<CcBoxPtr>) {
+        if unsafe { cc_box_ptr.as_ref() }.color() == Color::Gray {
             return;
         }
 
-        cc_box_ptr.data().color.set(Color::Gray);
+        unsafe { cc_box_ptr.as_ref().data() } .color.set(Color::Gray);
 
-        cc_box_ptr.trace(&mut |t| {
-            t.dec_strong();
-            mark_gray(t);
+        unsafe { cc_box_ptr.as_ref() }.trace(&mut |mut t| {
+            unsafe { t.as_ref() }.dec_strong();
+            mark_gray(NonNull::from(t));
         });
     }
 
@@ -213,7 +213,7 @@ fn mark_roots() {
     let mut new_roots : Vec<_> = old_roots.into_iter().filter_map(|mut s| {
         let keep = unsafe {
             if s.as_mut().color() == Color::Purple {
-                mark_gray(s.as_mut());
+                mark_gray(s);
                 true
             } else {
                 s.as_mut().data().buffered.set(false);
@@ -243,26 +243,26 @@ fn mark_roots() {
 /// White nodes if its reference count is 0 and it is part of a garbage cycle,
 /// or Black if the node is still live.
 fn scan_roots() {
-    fn scan_black(s: &mut CcBoxPtr) {
-        s.data().color.set(Color::Black);
-        s.trace(&mut |t| {
-            t.inc_strong();
-            if t.color() != Color::Black {
+    fn scan_black(s: NonNull<CcBoxPtr>) {
+        unsafe {s.as_ref()}.data().color.set(Color::Black);
+        unsafe {s.as_ref()}.trace(&mut |t| {
+            unsafe { t.as_ref() }.inc_strong();
+            if unsafe { t.as_ref() }.color() != Color::Black {
                 scan_black(t);
             }
         });
     }
 
-    fn scan(s: &mut CcBoxPtr) {
-        if s.color() != Color::Gray {
+    fn scan(s: NonNull<CcBoxPtr>) {
+        if unsafe {s.as_ref()}.color() != Color::Gray {
             return;
         }
 
-        if s.strong() > 0 {
+        if unsafe {s.as_ref()}.strong() > 0 {
             scan_black(s);
         } else {
-            s.data().color.set(Color::White);
-            s.trace(&mut |t| {
+            unsafe {s.as_ref()}.data().color.set(Color::White);
+            unsafe {s.as_ref()}.trace(&mut |t| {
                 scan(t);
             });
         }
@@ -272,7 +272,7 @@ fn scan_roots() {
         let mut v = r.borrow_mut();
         for s in &mut *v {
             let p : &mut CcBoxPtr = unsafe { s.as_mut() };
-            scan(p);
+            scan(*s);
         }
     });
 }
@@ -281,24 +281,24 @@ fn scan_roots() {
 
 /// Go through all the White roots and their garbage cycles and drop the nodes
 /// as we go. If a White node is still in the roots buffer, then leave it
-/// there. It will be freed in the nex collection when we iterate over the
+/// there. It will be freed in the next collection when we iterate over the
 /// buffer in `mark_roots`.
 fn collect_roots() {
-    fn collect_white(mut s: NonNull<CcBoxPtr>) {
+    fn collect_white(s: NonNull<CcBoxPtr>) {
         unsafe {
             if s.as_ref().color() == Color::White && !s.as_ref().buffered() {
                 s.as_ref().data().color.set(Color::Black);
-                s.as_mut().trace(&mut |t: &mut (CcBoxPtr + 'static)| {
-                    let ptr = t as *mut CcBoxPtr;
-                    let ptr : NonNull<CcBoxPtr> = NonNull::<CcBoxPtr>::from(t);
-                    collect_white(ptr);
+                s.as_ref().trace(&mut |t| {
+                    collect_white(t);
                 });
                 unsafe {
                     free(s);
                 }
             }
+
         }
     }
+
 
     /*fn collect_white_ref(t: &mut CcBoxPtr) {
         let ptr : NonNull<CcBoxPtr> = NonNull::<CcBoxPtr>::from(t);
@@ -307,7 +307,7 @@ fn collect_roots() {
 
     ROOTS.with(|r| {
         let mut v = r.borrow_mut();
-        for mut s in v.drain(..) {
+        for s in v.drain(..) {
             unsafe { s.as_ref() }.data().buffered.set(false);
             collect_white(s);
         }
