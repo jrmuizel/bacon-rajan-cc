@@ -212,14 +212,13 @@ fn mark_roots() {
 
     let mut new_roots : Vec<_> = old_roots.into_iter().filter_map(|mut s| {
         let keep = unsafe {
-            let box_ptr : &mut CcBoxPtr = s.as_mut();
-            if box_ptr.color() == Color::Purple {
-                mark_gray(box_ptr);
+            if s.as_mut().color() == Color::Purple {
+                mark_gray(s.as_mut());
                 true
             } else {
-                box_ptr.data().buffered.set(false);
+                s.as_mut().data().buffered.set(false);
 
-                if box_ptr.color() == Color::Black && box_ptr.strong() == 0 {
+                if s.as_mut().color() == Color::Black && s.as_mut().strong() == 0 {
                     free(s);
                 }
 
@@ -278,29 +277,39 @@ fn scan_roots() {
     });
 }
 
+
+
 /// Go through all the White roots and their garbage cycles and drop the nodes
 /// as we go. If a White node is still in the roots buffer, then leave it
 /// there. It will be freed in the nex collection when we iterate over the
 /// buffer in `mark_roots`.
 fn collect_roots() {
-    fn collect_white(s: &mut (CcBoxPtr + 'static)) {
-        if s.color() == Color::White && !s.buffered() {
-            s.data().color.set(Color::Black);
-            s.trace(&mut |t| {
-                collect_white(t);
-            });
-            unsafe {
-                free(s.into());
+    fn collect_white(mut s: NonNull<CcBoxPtr>) {
+        unsafe {
+            if s.as_ref().color() == Color::White && !s.as_ref().buffered() {
+                s.as_ref().data().color.set(Color::Black);
+                s.as_mut().trace(&mut |t: &mut (CcBoxPtr + 'static)| {
+                    let ptr = t as *mut CcBoxPtr;
+                    let ptr : NonNull<CcBoxPtr> = NonNull::<CcBoxPtr>::from(t);
+                    collect_white(ptr);
+                });
+                unsafe {
+                    free(s);
+                }
             }
         }
     }
 
+    /*fn collect_white_ref(t: &mut CcBoxPtr) {
+        let ptr : NonNull<CcBoxPtr> = NonNull::<CcBoxPtr>::from(t);
+        collect_white(ptr)
+    }*/
+
     ROOTS.with(|r| {
         let mut v = r.borrow_mut();
         for mut s in v.drain(..) {
-            let ptr : &mut CcBoxPtr = unsafe { s.as_mut() };
-            ptr.data().buffered.set(false);
-            collect_white(ptr);
+            unsafe { s.as_ref() }.data().buffered.set(false);
+            collect_white(s);
         }
     });
 }
